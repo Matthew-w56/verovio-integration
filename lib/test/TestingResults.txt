@@ -1,0 +1,21 @@
+
+
+Load and SVGExport
+- Test one was only a 5-measure line.  Very small.
+- Testing 10 times, repeated 10 times
+- Average per time (not per 10) was ~99ms
+
+Load and SVGExport
+- Test two was the previous file, repeated 10 times (10x size) (about one page of music)
+- Testing 10 times, repeated 10 times
+- Average per time (not per 10) was ~1000ms
+
+SVGExport Only
+- Test was the larger file
+- Testing 10 times, repeated 5 times
+- Average per time (not per 10) was ~74ms (10x faster than Loading AND export.)
+
+Load and SVGExport
+- Test was larger file, but with selection set to first 5 measures (size of test 1)
+- Testing 10 times, repeated 5 times
+- Average per time (not per 10) was ~
