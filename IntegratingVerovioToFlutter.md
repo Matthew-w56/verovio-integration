@@ -1,4 +1,4 @@
-## Integrating Verovio Into Flutter
+# Integrating Verovio Into Flutter
 
 - Cloning The Repo
 - Installing Build Dependencies
@@ -6,6 +6,7 @@
 - Creating New Flutter App And adding In Verovio
 - Installing Flutter Dependencies
 - Generating Bindings With FFIGen
+- Switching To The Installation Version
 - Using The Bindings / Weird Translation Things
 
 ## Cloning The Repo
@@ -25,29 +26,28 @@ The first step is to make sure that you are not in a normal terminal.  Go to you
     cd tools
     cmake ../cmake -G "NMake Makefiles" -DBUILD_AS_LIBRARY=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DNO_HUMDRUM_SUPPORT=ON
     nmake
+    nmake install
 
 This is assuming you do, in fact, have NMake.  If you got to the last step and found out that you don't, this is what I have seen works for those using Make
 
     cd tools
     cmake ../cmake -G "Unix Makefiles" -DBUILD_AS_LIBRARY=ON -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE -DNO_HUMDRUM_SUPPORT=ON
     make
+    make install
 
-Note: This does not mean that it builds for Unix.  The Make you install will take these and build for your system (I assume Windows x64).  When it's done (the final make step takes a good second to complete), you will see that the /tools/ directory has a verovio.dll as well as a number of other files.
+Note: This does not mean that it builds for Unix.  The Make you install will take these and build for your system (I assume Windows x64).  When it's done (the main build command takes a good second to complete), you will see that the /tools/ directory has a verovio.dll as well as a number of other files.
 
 ## Creating New Flutter App And Adding In Verovio
 
 The next step is to create the Flutter application that you want to interact with Verovio in.  I would strongly recommend that this isn't our team Gitlab repo.  I will integrate that in, given that I have a bit more experience with how it all works (I am also working on a nicer interface than what is discussed in the final section of this document).
 
-Once you have the Flutter application created and open, create a new folder inside of /lib/ called whatever you want (though I would recommend "verovio").  Also create a folder outside of the /lib/ directory (root directory of project) called font_data.  The repo calls the same folder "data", but that's vague and it really only holds musical notation fonts.  Then, you will copy the following files into the following locations:
+Once you have the Flutter application created and open, create a new folder inside of /lib/ called whatever you want (though I would recommend "verovio").  Then, you will copy the following files into that new folder:
 
-	Verovio Repo Path		--->	Flutter Library Path
-	----------------------------------------------------
-	/tools/verovio.dll		--->	/lib/verovio/
-	/tools/c_wrapper.cpp	--->	/lib/verovio/
-	/tools/c_wrapper.h		--->	/lib/verovio/
-	/data/*					--->	/font_data/
+	/tools/verovio.dll
+	/tools/c_wrapper.cpp
+	/tools/c_wrapper.h
 
-For this last one, just take everything inside of the data folder, and slap it into the font_data folder.  There is one last step for this part and this is one of the steps that I have no idea why it's needed, but it sure is.  Open up the c_wrapper.h file, and add a newline under the #endif line, and add an include for stdbool like this
+There is one last step for this part and this is one of the steps that I have no idea why it's needed, but it sure is.  Open up the c_wrapper.h file, and add a newline under the #endif line, and add an include for stdbool like this
 
 	#include <stdbool.h>
 
@@ -90,6 +90,10 @@ If the error message quotes error message 193, that means that your dll and flut
 
 If the error message quotes error message 123 (or somewhere in the 120's or 130's), the problem is that your path to your dll is incorrect.  Make sure that your path matches the dll's location.
 
+## Switching To The Installation Version
+
+Great, now you should have a good bindings file!  Creating this file was the only reason that we copied some of the files into our project; we can remove them now.  Specifically, you can delete the 3 files we moved into the /lib/verovio/ folder.  The only thing in there now should be the generated_bindings.dart, and whatever classes you build on top of that to help make interaction easier (I called mine verovio_method_store.dart for now).  Redirect the path
+
 ## Using The Bindings / Weird Translation Things
 
 Great, we got it building!  Now how do we use it?  At a high level, it is weird and requires use of type casting to get your inputs ready for C code, and to get the results ready for Dart code.  Here is my main.dart for my test application that calls a method or two from the library (creates an SVG for a blank piece of music which turns out to be an svg header).
@@ -106,12 +110,12 @@ Great, we got it building!  Now how do we use it?  At a high level, it is weird 
 
 	void dealWithLib() {
 		print("Starting to deal with the lib");
-		String path = absolute('lib', 'verovio', 'verovio.dll');
+		String path = "C:\\Program Files (x86)\\Verovio\\bin\\verovio.dll";
 		print("Path to lib: $path");
 		VerovioWrapper wrapper = VerovioWrapper(DynamicLibrary.open(path));
 		print(wrapper);
 	
-		var ptr = wrapper.vrvToolkit_constructorResourcePath("font_data".toNativeUtf8().cast());
+		var ptr = wrapper.vrvToolkit_constructorResourcePath("C:\\Program Files (x86)\\Verovio\\share\\verovio".toNativeUtf8().cast());
 		var result = wrapper.vrvToolkit_renderToSVG(ptr, 1, true);
 		print(result.cast<Utf8>().toDartString());
 	}
