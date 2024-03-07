@@ -19,3 +19,35 @@ Load and SVGExport
 - Test was larger file, but with selection set to first 5 measures (size of test 1)
 - Testing 10 times, repeated 5 times
 - Average per time (not per 10) was ~
+
+
+
+===========================================================================================
+Organized Testing Area
+===========================================================================================
+
+Test Name								Time (in ms)
+
+Stock Load And Render Test	=	=	=	100
+
+Render Only Test	=	=	=	=	=	10
+
+Load, Edit, and Render (Stable)	=	=	140
+
+
+
+
+
+
+===========================================================================================
+===========================================================================================
+
+Unstable Methods Tried:
+
+Pull an ignored MEI data
+Call redoLayout
+Call redoPitchPosLayout
+Call both redo Methods
+Call redoLayout with some slightly altered options value
+
+

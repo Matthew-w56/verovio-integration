@@ -32,7 +32,8 @@ class VerovioMethodStore {
   }
   
   String getOptions() {
-    return _charPointerToString(_binding.vrvToolkit_getOptions(_toolkitPointer));
+    return _charPointerToString(_binding.vrvToolkit_getAvailableOptions(_toolkitPointer));
+    //return _charPointerToString(_binding.vrvToolkit_getOptions(_toolkitPointer));
   }
   
   void setOptions(String newOptions) {
@@ -56,8 +57,26 @@ class VerovioMethodStore {
   }
   
   void executeEdit(String editToDo) {
-    bool success = _binding.vrvToolkit_edit(_toolkitPointer, _stringToCharPointer(editToDo));
-    print("\nAttempted edit:\n$editToDo\nWith result:\n$success\n");
+    _binding.vrvToolkit_edit(_toolkitPointer, _stringToCharPointer(editToDo));
+    Pointer<Char> newContent = _binding.vrvToolkit_getMEI(_toolkitPointer, _stringToCharPointer("{}"));
+    _binding.vrvToolkit_loadData(_toolkitPointer, newContent);
+  }
+  
+  void executeEditExperimental(String editToDo) {
+    _binding.vrvToolkit_edit(_toolkitPointer, _stringToCharPointer(editToDo));
+    _binding.vrvToolkit_redoLayout(_toolkitPointer, _stringToCharPointer("{'ledgerLineThickness': 0.32}"));
+  }
+  
+  void executeEditBROKEN(String editToDo) {
+    _binding.vrvToolkit_edit(_toolkitPointer, _stringToCharPointer(editToDo));
+  }
+  
+  String getEditInfo() {
+    return _charPointerToString(_binding.vrvToolkit_editInfo(_toolkitPointer));
+  }
+  
+  int getPageCount() {
+    return _binding.vrvToolkit_getPageCount(_toolkitPointer);
   }
   
 }

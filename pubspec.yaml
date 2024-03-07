@@ -34,5 +34,4 @@ ffigen:
       - 'lib/verovio/c_wrapper.h'
     include-directives:
       - '**c_wrapper.h'
-      - '**verovio.dll'
       - '**c_wrapper.cpp'

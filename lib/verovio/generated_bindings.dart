@@ -100,6 +100,20 @@ class VerovioWrapper {
   late final _vrvToolkit_edit =
       _vrvToolkit_editPtr.asFunction<DartVrvToolkit_edit>();
 
+  ffi.Pointer<ffi.Char> vrvToolkit_editInfo(
+    ffi.Pointer<ffi.Void> tkPtr,
+  ) {
+    return _vrvToolkit_editInfo(
+      tkPtr,
+    );
+  }
+
+  late final _vrvToolkit_editInfoPtr =
+      _lookup<ffi.NativeFunction<NativeVrvToolkit_editInfo>>(
+          'vrvToolkit_editInfo');
+  late final _vrvToolkit_editInfo =
+      _vrvToolkit_editInfoPtr.asFunction<DartVrvToolkit_editInfo>();
+
   ffi.Pointer<ffi.Char> vrvToolkit_getAvailableOptions(
     ffi.Pointer<ffi.Void> tkPtr,
   ) {
@@ -684,6 +698,10 @@ typedef NativeVrvToolkit_edit = ffi.Bool Function(
     ffi.Pointer<ffi.Void> tkPtr, ffi.Pointer<ffi.Char> editorAction);
 typedef DartVrvToolkit_edit = bool Function(
     ffi.Pointer<ffi.Void> tkPtr, ffi.Pointer<ffi.Char> editorAction);
+typedef NativeVrvToolkit_editInfo = ffi.Pointer<ffi.Char> Function(
+    ffi.Pointer<ffi.Void> tkPtr);
+typedef DartVrvToolkit_editInfo = ffi.Pointer<ffi.Char> Function(
+    ffi.Pointer<ffi.Void> tkPtr);
 typedef NativeVrvToolkit_getAvailableOptions = ffi.Pointer<ffi.Char> Function(
     ffi.Pointer<ffi.Void> tkPtr);
 typedef DartVrvToolkit_getAvailableOptions = ffi.Pointer<ffi.Char> Function(

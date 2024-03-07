@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_print
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:verovio_integration/myIO.dart';
 import 'package:verovio_integration/verovio/verovio_method_store.dart';
@@ -11,8 +13,7 @@ void doPrintTimesList(List<int> times, String title, int reps, int sets) {
   
   print("");
   print("-----------------------------------------");
-  print("Testing results:");
-  print("Done $reps times, repeated $sets times");
+  print("Testing results from a ${reps}x$sets");
   print("-----------------------------------------");
   print(title);
   print("-----------------------------------------");
@@ -24,32 +25,49 @@ void doPrintTimesList(List<int> times, String title, int reps, int sets) {
   print("");
 }
 
+void performTest(Function testFunc, int reps, int sets, VerovioMethodStore verovio, String content, String title) {
+  List<int> timesList = [];
+  for (int i = 0; i < sets; i++) {
+    int startTime = DateTime.now().millisecondsSinceEpoch;
+    for (int j = 0; j < reps; j++) {
+      testFunc(verovio, content);
+    }
+    timesList.add(DateTime.now().millisecondsSinceEpoch - startTime);
+  }
+  doPrintTimesList(timesList, title, reps, sets);
+}
+
 void doLibTests(int reps, int sets) {
   VerovioMethodStore verovio = VerovioMethodStore();
-  String content = IOWorker.getFileText("fullPage.mei");
+  String content = IOWorker.getFileText("oneLine.mei");
   
-  // Test a full-page load and render
-  List<int> fullLoadRenderTimes = [];
-  for (int i = 0; i < sets; i++) {
-    int startTime = DateTime.now().millisecondsSinceEpoch;
-    for (int j = 0; j < reps; j++) {
-      testLoadAndRenderFull(verovio, content);
-    }
-    fullLoadRenderTimes.add(DateTime.now().millisecondsSinceEpoch - startTime);
-  }
-  doPrintTimesList(fullLoadRenderTimes, "Full Load and Render Test (Full Page)", reps, sets);
+  // print(verovio.getOptions());
   
-  // Test a full-page load and render
+  performTest(
+    testLoadAndRenderFull,
+    reps, sets, verovio, content,
+    "Stock Load And Render Test"
+  );
+  
+  // Load the data in so that there's something to render
   verovio.loadData(content);
-  List<int> onlyRenderTimes = [];
-  for (int i = 0; i < sets; i++) {
-    int startTime = DateTime.now().millisecondsSinceEpoch;
-    for (int j = 0; j < reps; j++) {
-      testRenderOnly(verovio);
-    }
-    onlyRenderTimes.add(DateTime.now().millisecondsSinceEpoch - startTime);
-  }
-  doPrintTimesList(onlyRenderTimes, "Render Only Tests (Full Page)", reps, sets);
+  performTest(
+    testRenderOnly,
+    reps, sets, verovio, "",
+    "Render Only Test"
+  );
+  
+  performTest(
+    testEditAndRenderStable,
+    reps, sets, verovio, content,
+    "Load, Edit, and Render (Stable) Test"
+  );
+  
+  performTest(
+    testEditAndRenderUnstable,
+    reps, sets, verovio, content,
+    "Load, Edit, and Render (UNSTABLE) Test"
+  );
 }
 
 void testLoadAndRenderFull(VerovioMethodStore verovio, String content) {
@@ -57,26 +75,52 @@ void testLoadAndRenderFull(VerovioMethodStore verovio, String content) {
   verovio.getSVGOutput();
 }
 
-void testRenderOnly(VerovioMethodStore verovio) {
+void testRenderOnly(VerovioMethodStore verovio, String _) {
   verovio.getSVGOutput();
+}
+
+void testEditAndRenderStable(VerovioMethodStore verovio, String content) {
+  verovio.loadData(content);
+  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
+  verovio.getSVGOutput();
+}
+
+void testEditAndRenderUnstable(VerovioMethodStore verovio, String content) {
+  verovio.loadData(content);
+  verovio.executeEditExperimental("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
+  String output = verovio.getSVGOutput();
+  print(output);
 }
 
 void experimentLibFuncs() {
   VerovioMethodStore verovio = VerovioMethodStore();
   String content = IOWorker.getFileText("fullPage.mei");
   verovio.loadData(content);
+  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
+  verovio.executeEdit("{'action': 'commit'}");
+  print("Page in score: ${verovio.getPageCount()}");
+  String svgContent = verovio.getSVGOutput();
+  File file = File("C:/Users/mbwil/Desktop/alteredOutput2.svg");
+  print("-----------------GOT FILE BUILT");
+  file.writeAsString(svgContent);
   
-  print("About to edit score");
+  /*print("About to edit score");
   // Now try to edit the score
-  //verovio.executeEdit("{'action': 'remove', 'param': {'elementId': 'd1e1498'}}");
-  //verovio.executeEdit("{'action': 'keyDown', 'param': {'elementId': 'd1e1498', 'key': 1}}");
-  //verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e1498'}}");
+  //verovio.executeEdit("{'action': 'remove', 'param': {'elementId': 'd1e966'}}");
+  //verovio.executeEdit("{'action': 'keyDown', 'param': {'elementId': 'd1e966', 'key': 1}}");
+  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
+  verovio.executeEdit("{'action': 'commit', 'param': {}}");
   print("Done editing score");
+  String svgContent = verovio.getSVGOutput();
+  print("-----------------SVG BUILT");
+  File file = File("C:/Users/mbwil/Desktop/alteredOutput.svg");
+  print("-----------------GOT FILE BUILT");
+  file.writeAsString(svgContent);*/
 }
 
 void main() {
-  // doLibTests(5, 5);
-  experimentLibFuncs();
+  doLibTests(5, 5);
+  // experimentLibFuncs();
   runApp(const MainApp());
 }
 

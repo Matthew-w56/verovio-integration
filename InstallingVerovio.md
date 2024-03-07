@@ -9,7 +9,7 @@ This is a quick guide for how to install Verovio to your machine to make the cod
 
 ## Cloning The Verovio Repository
 
-Cclone their repository from: [Verovio github page](https://github.com/rism-digital/verovio) (Command below, so the link is just if you want to see it).  I would suggest cloning their repo somewhere basic (and not in the directory of the flutter project itself).  This is because, once you build it, you don't need to keep their repository around.  So once you build this, you can just delete the repo itself.  Personally, I just cloned to my Desktop, so I can see it easy and delete it fast when I need to.  Also, if you happen to notice that this is the "develop" branch rather than the "master", don't worry.  That is the branch they do all their work on, and is kept stable at all times.
+Clone their repository from: [Verovio github page](https://github.com/rism-digital/verovio) (Command below, so the link is just if you want to see it).  I would suggest cloning their repo somewhere basic (and not in the directory of the flutter project itself).  This is because, once you build it, you don't need to keep their repository around.  So once you build this, you can just delete the repo itself.  Personally, I just cloned to my Desktop, so I can see it easy and delete it fast when I need to.  Also, if you happen to notice that this is the "develop" branch rather than the "master", don't worry.  That is the branch they do all their work on, and is kept stable at all times.
 
   git clone https://github.com/rism-digital/verovio.git
 
