@@ -28,26 +28,19 @@ Organized Testing Area
 
 Test Name								Time (in ms)
 
-Stock Load And Render Test	=	=	=	100
 
-Render Only Test	=	=	=	=	=	10
+Stock Load And Render Test	=	=	=	90
 
-Load, Edit, and Render (Stable)	=	=	140
+Render Only Test	=	=	=	=	=	8.5
 
+Load, Edit, and Render (Stable)	=	=	86
 
-
-
+Edit and Render Only Test	=	=	=	9.6
 
 
 ===========================================================================================
 ===========================================================================================
 
-Unstable Methods Tried:
 
-Pull an ignored MEI data
-Call redoLayout
-Call redoPitchPosLayout
-Call both redo Methods
-Call redoLayout with some slightly altered options value
 
 

@@ -4,7 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:verovio_integration/myIO.dart';
-import 'package:verovio_integration/verovio/verovio_method_store.dart';
+import 'package:verovio_integration/verovio/verovio_api.dart';
+
+bool addRemoveSwitch = true;
+int c = 0;
 
 void doPrintTimesList(List<int> times, String title, int reps, int sets) {
   int sum = times.fold(0, (previousValue, element) => previousValue += element);
@@ -25,7 +28,7 @@ void doPrintTimesList(List<int> times, String title, int reps, int sets) {
   print("");
 }
 
-void performTest(Function testFunc, int reps, int sets, VerovioMethodStore verovio, String content, String title) {
+void performTest(Function testFunc, int reps, int sets, VerovioAPI verovio, String content, String title) {
   List<int> timesList = [];
   for (int i = 0; i < sets; i++) {
     int startTime = DateTime.now().millisecondsSinceEpoch;
@@ -38,15 +41,16 @@ void performTest(Function testFunc, int reps, int sets, VerovioMethodStore verov
 }
 
 void doLibTests(int reps, int sets) {
-  VerovioMethodStore verovio = VerovioMethodStore();
+  VerovioAPI verovio = VerovioAPI();
   String content = IOWorker.getFileText("oneLine.mei");
+  verovio.loadData(content);
   
   // print(verovio.getOptions());
   
   performTest(
     testLoadAndRenderFull,
     reps, sets, verovio, content,
-    "Stock Load And Render Test"
+    "Base Load And Render Test"
   );
   
   // Load the data in so that there's something to render
@@ -58,42 +62,72 @@ void doLibTests(int reps, int sets) {
   );
   
   performTest(
-    testEditAndRenderStable,
+    testLoadEditAndRender,
     reps, sets, verovio, content,
-    "Load, Edit, and Render (Stable) Test"
+    "Load, Edit, and Render Test"
   );
   
+  // Load the data in so that there's something to edit/render
+  verovio.loadData(content);
   performTest(
-    testEditAndRenderUnstable,
-    reps, sets, verovio, content,
-    "Load, Edit, and Render (UNSTABLE) Test"
+    testEditAndRenderOnly,
+    reps, sets, verovio, "",
+    "Edit and Render Only Test"
   );
+  
+  // Load the data in so that there's something to edit/render
+  /*verovio.loadData(content);
+  performTest(
+    testEditPlaceAndRender,
+    reps, sets, verovio, "",
+    "Edit, Place, and Render Test"
+  );*/
 }
 
-void testLoadAndRenderFull(VerovioMethodStore verovio, String content) {
+void testLoadAndRenderFull(VerovioAPI verovio, String content) {
   verovio.loadData(content);
   verovio.getSVGOutput();
 }
 
-void testRenderOnly(VerovioMethodStore verovio, String _) {
+void testRenderOnly(VerovioAPI verovio, String _) {
   verovio.getSVGOutput();
 }
 
-void testEditAndRenderStable(VerovioMethodStore verovio, String content) {
+void testLoadEditAndRender(VerovioAPI verovio, String content) {
   verovio.loadData(content);
-  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
+  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e190'}}");
   verovio.getSVGOutput();
 }
 
-void testEditAndRenderUnstable(VerovioMethodStore verovio, String content) {
-  verovio.loadData(content);
-  verovio.executeEditExperimental("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
-  String output = verovio.getSVGOutput();
-  print(output);
+void testEditAndRenderOnly(VerovioAPI verovio, String _) {
+  if (addRemoveSwitch) {
+    verovio.executeEdit("{'action': 'delete', 'param': {'elementId': '[chained-id]'}}");
+  } else {
+    verovio.executeEdit("{'action': 'insert', 'param': {'elementType': 'note', 'startid': 'd34e1'}}");
+  }
+  verovio.getSVGOutput();
+  addRemoveSwitch = !addRemoveSwitch;
+}
+
+/// This method doesn't work right now
+void testEditPlaceAndRender(VerovioAPI verovio, String _) {
+  if (addRemoveSwitch) {
+    verovio.executeEdit("{'action': 'delete', 'param': {'elementId': '[chained-id]'}}");
+  } else {
+    verovio.executeEdit("{'action': 'insert', 'param': {'elementType': 'note', 'startid': 'd34e1'}}");
+    verovio.executeEdit("{'action': 'set', 'param': {'elementId': '[chained-id]', 'attribute': 'oct', 'value': '3'}}");
+    //verovio.redoPitchPosLayout();
+    //verovio.redoLayout();
+  }
+  String svg = verovio.getSVGOutput();
+  File file = File("C:/Users/mbwil/Desktop/output/testing/secondaryOutput$c.svg");
+  c++;
+  file.writeAsString(svg);
+  addRemoveSwitch = !addRemoveSwitch;
 }
 
 void experimentLibFuncs() {
-  VerovioMethodStore verovio = VerovioMethodStore();
+  VerovioAPI verovio = VerovioAPI();
   String content = IOWorker.getFileText("fullPage.mei");
   verovio.loadData(content);
   verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
@@ -103,23 +137,10 @@ void experimentLibFuncs() {
   File file = File("C:/Users/mbwil/Desktop/alteredOutput2.svg");
   print("-----------------GOT FILE BUILT");
   file.writeAsString(svgContent);
-  
-  /*print("About to edit score");
-  // Now try to edit the score
-  //verovio.executeEdit("{'action': 'remove', 'param': {'elementId': 'd1e966'}}");
-  //verovio.executeEdit("{'action': 'keyDown', 'param': {'elementId': 'd1e966', 'key': 1}}");
-  verovio.executeEdit("{'action': 'delete', 'param': {'elementId': 'd1e966'}}");
-  verovio.executeEdit("{'action': 'commit', 'param': {}}");
-  print("Done editing score");
-  String svgContent = verovio.getSVGOutput();
-  print("-----------------SVG BUILT");
-  File file = File("C:/Users/mbwil/Desktop/alteredOutput.svg");
-  print("-----------------GOT FILE BUILT");
-  file.writeAsString(svgContent);*/
 }
 
 void main() {
-  doLibTests(5, 5);
+  doLibTests(10, 10);
   // experimentLibFuncs();
   runApp(const MainApp());
 }

@@ -1,6 +1,6 @@
 # Installing Verovio to Your Machine
 
-This is a quick guide for how to install Verovio to your machine to make the code in this project work.  Quick note: This is meant for Windows 10.  If that isn't the system you are using, the steps still apply but will have differences in syntax.  And don't worry; as hard as it kicked my butt as I tried to get this working the first time, the instructions aren't too hard to follow.  Here's the general steps that we will follow:
+This is a quick guide for how to install Verovio to your machine to make the code in this project work.  Quick note: This is meant for Windows 10.  If that isn't the system you are using, the steps still apply but will have differences in syntax.  Here's the general steps that we will follow:
 
 - [Clone The Verovio Repository](#cloning-the-verovio-repository)
 - [Installing Any Tools We Need](#installing-any-tools-we-need)
@@ -15,7 +15,7 @@ Clone their repository from: [Verovio github page](https://github.com/rism-digit
 
 ## Installing Any Tools We Need
 
-The first thing you will need is Visual Studio installed, preferrably 2022 though I don't think it makes a difference.  Also make sure you have the "C++ Desktop Development" workload installed, as it includes various tools that you'll need later and for running and debugging in general.  You can make sure you have this through the Visual Studio Installer, and modifying your installation.
+The first thing you will need is Visual Studio installed, preferrably 2022 though I don't think it makes a difference.  Also make sure you have the "C++ Desktop Development" workload installed, as it includes various tools that you'll need later and for running and debugging in general (Note here: just having the Visual Studio Build Tools installed rather than the full IDE works too, just make sure it has the same workload).  You can make sure you have this through the Visual Studio Installer, and modifying your installation(s).
 
 The second thing you need right now is some Make program.  You can either install [Make From Here](https://gnuwin32.sourceforge.net/packages/make.htm), or you can use NMake (which is what I used).  I'm not certain if I ended up installing NMake, or if I already had it as part of my existing toolkits, but you can try the build step and see if it lets you do it.  If not, using Make with the link mentioned may be the easiest.  I installed so many different things trying to get this stuff working that I don't remember how I landed on NMake.
 
@@ -35,10 +35,10 @@ This is assuming you do, in fact, have NMake.  If you got to the last step and f
     make
     make install
 
-Note: This does not mean that it builds for Unix.  The Make you install will take these and build for your system (I assume Windows x64).  When it's done (the main build command takes a good second to complete), you will see that the /tools/ directory has a verovio.dll as well as a number of other files.
+Note: "Unix Makefiles" does not mean that it builds for Unix.  The Make program you installed is a natively Unix application.  But it will take these and build for your system (I assume Windows x64).  When it's done (the main build command takes a good second to complete), you will see that the /tools/ directory has a verovio.dll as well as a number of other files.
 
 ## Installing Verovio Into Our System
 
 By running the final command above (the "install" command), it will take all the vital stuff you need (the .dll, resource files, headers) and put them all under your C:/Program Files (x86)/ directory, under the folder /Verovio/.  Now, while you have built a 64-bit dll, it will still install into the (x86) Program Files, don't worry about that.  32-bit is the default for their project (which is one reason why we had to use the special terminal: so it builds in 64-bit mode), and they haven't gotten around to moving it into the right Program Files yet for the times where you are building in 64-bit mode.
 
-So you've done it!  From here, you can delete the entire repository that you have cloned; you don't need it any more.  The program in this repository should work just fine for you now.
+So you've done it!  From here, you can delete the entire repository that you have cloned; you don't need it any more.  The program in this repository should work just fine for you now.  The flutter program looks for the .dll file in your Program Files and uses that.
