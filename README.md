@@ -8,4 +8,4 @@ This program will not compile and run out of the box.  The program relies on the
 
 ## Using Verovio in Your Own Project
 
-To use Verovio in your own project, all you need to do is follow the steps in the previously linked file, which lines out how to install Verovio into your system.  Then, copy over all the files in the /lib/verovio/ directory into your project.  Making sure you use the same path will cut down on the number of places that you need to change a path, but it's free to go wherever.  Then just use the [API class](./lib/verovio/Verovio_api.dart)
+To use Verovio in your own project, all you need to do is follow the steps in the previously linked file, which lines out how to install Verovio into your system.  Then, copy over all the files in the /lib/verovio/ directory into your project.  Making sure you use the same path will cut down on the number of places that you need to change a path, but it's free to go wherever.  Then just use the [API class](./lib/verovio/verovio_api.dart)
