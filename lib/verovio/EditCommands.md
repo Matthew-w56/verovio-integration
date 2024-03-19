@@ -18,8 +18,6 @@ Here's a list of all the most common commands, and their parameters.  Each with 
 	Parameter: elementId
 	Example:  {'action': 'delete', 'param': { 'elementId': 'd11984b6' } }
 	
-Below are ones that I haven't gotten into learning yet but I'll update as I do.  Parameters in curly brackets {} are optional.
-
 	Action: Chain
 	Parameters: Array of sub-actions.
 	Example:  {'action': 'chain', 'param': [
@@ -29,6 +27,8 @@ Below are ones that I haven't gotten into learning yet but I'll update as I do. 
 	]}
 	The element ID of the previously dealt with element is kept for the next chain.  To refer to it, use the id '[chained-id]'.
 	
+Below are ones that I haven't gotten into learning yet but I'll update as I do.  Parameters in curly brackets {} are optional.
+	
 	Action: Insert
 	Parameters: elementType, startid, {endid}
 	
@@ -37,7 +37,7 @@ Below are ones that I haven't gotten into learning yet but I'll update as I do. 
 	
 	Action: Drag
 	Parameters: elementId, x, y
-	This method actually calculates the new pitch of a note dragged to those coordinates.
+	This method calculates the new pitch of a note dragged to those coordinates.
 	
 	Action: KeyDown
 	Parameters: elementId, key, {shiftKey, ctrlKey}
