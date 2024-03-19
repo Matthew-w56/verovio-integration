@@ -4,7 +4,7 @@ A Proof-Of-Concept program to show that Verovio can be imported into a Flutter D
 
 ## Running (_IMPORTANT!_)
 
-This program will not compile and run out of the box.  The program relies on the library being built on your machine, and installed.  To get that done quickly, follow the instructions in the file [Found Here](./lib/verovio/InstallingVerovio.md).
+This program will not compile and run out of the box.  The program relies on the library being built on your machine, and installed.  It isn't difficult, or a long process, but the program relies on the .dll being built into your Program Files (x86) directory.  To get that done quickly, follow the instructions in the file [Found Here](./lib/verovio/InstallingVerovio.md).
 
 ## Using Verovio in Your Own Project
 
