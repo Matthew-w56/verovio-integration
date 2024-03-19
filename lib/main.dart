@@ -4,18 +4,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:jovial_svg/jovial_svg.dart';
+import 'package:verovio_integration/test/verovio_tests.dart';
 
 import 'myIO.dart';
 import 'verovio/verovio_api.dart';
 
 void makeVerovioEngraving() {
   VerovioAPI verovio = VerovioAPI();
-  String meiContent = IOWorker.getFileText("oneLine.mei");
+  String meiContent = IOWorker.getFileText("Joplin_Maple_leaf_Rag.mei");
   // print(verovio.getOptions());
   verovio.setOptions("""{
-    'scale': 130,
     'footer': 'none'
   }""");
   verovio.loadData(meiContent);
@@ -26,26 +25,20 @@ void makeVerovioEngraving() {
 }
 
 void main() {
-  //makeVerovioEngraving();
-  runApp(MainApp());
+  makeVerovioEngraving();
+  //doLibTests(50, 50);
+  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {
-  MainApp({super.key});
-  
-  Function getSvgContent = () {
-    VerovioAPI verovio = VerovioAPI();
-    String meiContent = IOWorker.getFileText("oneLine.mei");
-    verovio.loadData(meiContent);
-    return verovio.getSVGOutput();
-  };
+  const MainApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
         body: Center(
-          child: ScalableImageWidget(si: ScalableImage.fromSvgString(getSvgContent()))
+          child: ScalableImageWidget(si: ScalableImage.fromSvgString(IOWorker.getFileText("svgOutput.svg")))
           /*child: ScalableImageWidget.fromSISource (
             //si: ScalableImageSource.fromSvg(rootBundle, "assets/svgOutput.svg"),
             si: ScalableImage.fromSvgString(""),

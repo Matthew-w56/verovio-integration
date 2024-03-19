@@ -13,6 +13,8 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:verovio_integration/verovio/generated_bindings.dart';
 
+import 'svg_adjustor.dart';
+
 
 class VerovioAPI {
   
@@ -56,6 +58,16 @@ class VerovioAPI {
   /// use the generateXml parameter if you want the general XML header at the beginning of it
   /// (false by default)
   String getSVGOutput({int page = 1, bool generateXml = false}) {
+    String svgRaw = _charPointerToString(_binding.vrvToolkit_renderToSVG(_toolkitPointer, page, generateXml));
+    return SVGAdjustor.adjustSVG(svgRaw);
+  }
+  
+    /// Returns a String containing the SVG representation of the score (or selection, if one is
+  /// set currently).  Use the page parameter to decide which page to render (1 by default), and
+  /// use the generateXml parameter if you want the general XML header at the beginning of it
+  /// (false by default)
+  @Deprecated("This Method is only for testing purposes and will cause rendering to break.  Use getSVGOutput.")
+  String getSVGOutputNoAdjust({int page = 1, bool generateXml = false}) {
     return _charPointerToString(_binding.vrvToolkit_renderToSVG(_toolkitPointer, page, generateXml));
   }
   

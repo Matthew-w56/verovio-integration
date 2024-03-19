@@ -3,6 +3,8 @@
 
 import 'dart:io';
 
+import 'package:verovio_integration/verovio/svg_adjustor.dart';
+
 import '../myIO.dart';
 import '../verovio/verovio_api.dart';
 
@@ -43,11 +45,11 @@ void performTest(Function testFunc, int reps, int sets, VerovioAPI verovio, Stri
 
 void doLibTests(int reps, int sets) {
   VerovioAPI verovio = VerovioAPI();
-  String content = IOWorker.getFileText("oneLine.mei");
-  verovio.loadData(content);
+  String content = IOWorker.getFileText("Joplin_Maple_leaf_Rag.mei");
+  //verovio.loadData(content);
   
   // print(verovio.getOptions());
-  
+  /*
   performTest(
     testLoadAndRenderFull,
     reps, sets, verovio, content,
@@ -74,6 +76,14 @@ void doLibTests(int reps, int sets) {
     testEditAndRenderOnly,
     reps, sets, verovio, "",
     "Edit and Render Only Test"
+  );*/
+  
+  verovio.loadData(content);
+  String svgRaw = verovio.getSVGOutputNoAdjust();
+  performTest(
+    testAdjustSVGMethod,
+    reps, sets, verovio, svgRaw,
+    "SVG Adjusting test"
   );
   
   // Load the data in so that there's something to edit/render
@@ -83,6 +93,10 @@ void doLibTests(int reps, int sets) {
     reps, sets, verovio, "",
     "Edit, Place, and Render Test"
   );*/
+}
+
+void testAdjustSVGMethod(VerovioAPI verovio, String content) {
+  SVGAdjustor.adjustSVG(content);
 }
 
 void testLoadAndRenderFull(VerovioAPI verovio, String content) {
