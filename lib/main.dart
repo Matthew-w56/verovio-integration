@@ -38,7 +38,10 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       home: Scaffold(
         body: Center(
-          child: ScalableImageWidget(si: ScalableImage.fromSvgString(IOWorker.getFileText("svgOutput.svg")))
+          child: ScalableImageWidget(
+            si: ScalableImage.fromSvgString(IOWorker.getFileText("svgOutput.svg")),
+            fit: BoxFit.cover
+          )
           /*child: ScalableImageWidget.fromSISource (
             //si: ScalableImageSource.fromSvg(rootBundle, "assets/svgOutput.svg"),
             si: ScalableImage.fromSvgString(""),
