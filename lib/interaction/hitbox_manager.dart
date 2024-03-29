@@ -1,11 +1,14 @@
 
+// Author: Matthew Williams
+// 
+// Few things to know about this class:
+//  - "Accid" means accidental (sharp or flat sign)
+//  - "Dir" means directive (plain text telling the player what to do or how to do it)
+//  - When using any numbering system, the general rule is that 10 = 1px.
+//    - So a box of size 1000x1000 is actually 100px square
+
 // ignore_for_file: non_constant_identifier_names, avoid_print, constant_identifier_names
 
-/// TODO for next time:
-/// Realize that the page offset was 500 in each direction.  This may possibly simplify the
-/// hitbox stuff.  Fix the problem by adding in the offsets, and finding how to get
-/// bounds from the true box.  Maybe it really is drawing at the top left?  But
-/// then why is it flipped?
 
 import 'dart:math';
 
@@ -20,27 +23,37 @@ class HitboxManager {
   //  typo problems
   static const String 
       _ACCID = "accid",
+      _BARLINE = "barLine",
       _BEAM = "beam",
       _CHORD = "chord",
       _CLASS = "class",
+      _CLEF = "clef",
       _D = "d",
       _DEFS = "defs",
+      _DIR = "dir",
+      _DYNAM = "dynam",
       _G = "g",
+      _HAIRPIN = "hairpin",
       _HEIGHT = "height",
       _ID = "id",
+      _KEYACCID = "keyAccid",
+      _KEYSIG = "keySig",
       _LAYER = "layer",
       _MEASURE = "measure",
+      _METERSIG = "meterSig",
       _MREST = "mRest",
       _NOTE = "note",
       _PAGE_MARGIN = "page-margin", 
       _PATH = "path",
       _REST = "rest",
+      _SLUR = "slur",
       _SPACE = "space",
       _STAFF = "staff",
       _STEM = "stem",
       _SVG = "svg",
       _SYMBOL = "symbol",
       _SYSTEM = "system",
+      _TIE = "tie",
       _TRANSFORM = "transform",
       _VIEWBOX = "viewBox",
       _WIDTH = "width",
@@ -49,12 +62,15 @@ class HitboxManager {
   
   static const List<String> 
       ElementsToIgnoreDuringUnpacking = [_STEM, _SPACE],
-      ElementsToUnpackFurther = [_BEAM, _CHORD],
-      ElementsWhoseIDToIgnore = [_BEAM];
+      ElementsToUnpackFurther = [_BEAM, _CHORD, _LAYER, _KEYSIG],
+      ElementsWhoseIDToIgnore = [_BEAM, _LAYER],
+      XmlElementsToGrabFromStaff = [_LAYER, _KEYSIG, _CLEF, _METERSIG],
+      SpecialRectsToGrabFromMeasure = [_DYNAM, _SLUR, _DIR, _HAIRPIN, _TIE];
   
-  static const int ASSUMED_VIEWPORT_SIZE = 1000;
+  static const int ASSUMED_SYMBOL_VIEWPORT_SIZE = 1000;
   
   static const int LowestStaffHitboxMargin = 40;
+  static const int KeyAccidExtraWidth = 80;
   
   // When representing a hitbox, 7 numbers are used.
   //  0  1    2      3       4    5      6
@@ -63,7 +79,8 @@ class HitboxManager {
   Map<String, List<int>> symbolBounds = {};
 
   List<int> rowMarkers = [];
-  //List<List<int>> specialRects = [];
+  List<List<List<int>>> floatingRects = [];
+  List<List<String>> floatingRectDesc = [];
   List<List< int >> columnMarkers = [];
   List<List< String >> elementGroupIDs = [];
   // Inner list is one note group (chord, note, etc)
@@ -80,7 +97,49 @@ class HitboxManager {
   
   HitboxManager();
   
+  int getRowIndex(int y) {
+    for (int r = 0; r < rowMarkers.length; r++) {
+      if (rowMarkers[r] >= y) return r-1;
+    }
+    return -1;
+  }
+  
+  int getColIndex(int rowIndex, int x) {
+    if (rowIndex == -1) return -1;
+    for (int c = 0; c < columnMarkers[rowIndex].length; c++) {
+      if (columnMarkers[rowIndex][c] >= x) return c-1;
+    }
+    return -1;
+  }
+  
+  /// Returns "" when none found
+  String getElementId(int x, int y) {
+    print("Checking $x,$y");
+    int r = getRowIndex(y);
+    int c = getColIndex(r, x);
+    print("r=$r c=$c");
+    if (r < 0 || c < 0) return "";
+    int boxI = 0;
+    for (List<int> box in elementHitboxes[r][c]) {
+      print("checking id: ${elementIDs[r][c][boxI]}");
+      if (x > box[0] && x < (box[0] + box[2])
+          && y > box[1] && y < (box[1] + box[3])) {
+        return elementIDs[r][c][boxI];
+      }
+      boxI++;
+    }
+    return "";
+  }
+  
+  String getElementGroupId(int x, int y) {
+    int r = getRowIndex(y);
+    int c = getColIndex(r, x);
+    return elementGroupIDs[r][c];
+  }
+  
   void initHitboxes(String imageSVG) {
+    // Test
+    //columnMarkers.add([]);
     
     // Let the XML library parse the SVG document as an xml doc
     final doc = XmlDocument.parse(imageSVG);
@@ -131,8 +190,8 @@ class HitboxManager {
       int i = 0;
       for (XmlNode staff in staves) {
         Iterable<XmlElement> staffLines = staff.findElements(_PATH);
-        rowMinY[i] = int.parse(staffLines.first.getAttribute(_D)!.split(" ")[1]);
-        rowMaxY[i] = int.parse(staffLines.last.getAttribute(_D)!.split(" ")[1]);
+        rowMinY[i] = int.parse(staffLines.first.getAttribute(_D)!.split(" ")[1]) + pageOffsetY;
+        rowMaxY[i] = int.parse(staffLines.last.getAttribute(_D)!.split(" ")[1]) + pageOffsetY;
         i++;
       }
       
@@ -141,12 +200,14 @@ class HitboxManager {
       int systemRowIndex = columnMarkers.length;
       // This is the start of the system (line).  Acts to define page margin in hitboxes
       int marginSeperator = int.parse(system.firstElementChild!.getAttribute(_D)!.split(" ")[0].substring(1));
+      marginSeperator += pageOffsetX;
       // Add a new row for each staff.  Column marker gets margin seperator, and element ID for margin is ""
-      print("Choosing margin seperator as $marginSeperator");
       columnMarkers.addAll(List.generate(staffCount, (_) => [marginSeperator]));
       elementGroupIDs.addAll(List.generate(staffCount, (_) => [""]));
       elementHitboxes.addAll(List.generate(staffCount, (_) => []));
       elementIDs.addAll(List.generate(staffCount, (_) => []));
+      floatingRects.addAll(List.generate(staffCount, (_) => []));
+      floatingRectDesc.addAll(List.generate(staffCount, (_) => []));
       
       // Handle the measures themselves now
       for (XmlElement measure in system.childElements) {
@@ -154,32 +215,40 @@ class HitboxManager {
         //print("----------=[ Starting Measure ]=----------");
         
         int measureEndX = 77;
-        List<String>? barLines = measure.firstElementChild?.firstElementChild?.getAttribute(_D)?.split(" ");
+        XmlElement firstStaff = measure.firstElementChild!;
+        if (firstStaff.getAttribute(_CLASS) != _STAFF) {
+          // If first wasn't staff (usually measure numbers), go to next
+          firstStaff = measure.childElements.elementAt(1);
+        }
+        //
+        List<String>? barLines = firstStaff.firstElementChild?.getAttribute(_D)?.split(" ");
         if (barLines == null) {
           print("Measure did not have bar lines!  measure first child: ${measure.firstElementChild}");
+          // This must be the first measure of the line.  Grab 
         } else {
           measureEndX = int.parse(barLines[2].substring(1)) + pageOffsetX;
         }
        
         
         int measureStaffIndex = systemRowIndex;
-        for (XmlElement staff in measure.childElements) {
-          if (staff.getAttribute(_CLASS) != _STAFF) continue;
-
-          print("----------=[ Starting Staff $measureStaffIndex ]=----------");
-          
-          print("Measure end at $measureEndX");
+        for (XmlElement measureChild in measure.childElements) {
+          if (measureChild.getAttribute(_CLASS) != _STAFF) {
+              if (SpecialRectsToGrabFromMeasure.contains(measureChild.getAttribute(_CLASS))) {
+                parseFloatingRect(measureChild);
+              }
+              // Don't move on to treat this like a staff
+              continue;
+          }
+          //print("----------=[ Starting Staff $measureStaffIndex ]=----------");
           
           List< List<int> > boundList = [];
           List<String> idList = [];
           int layerIndex = 0;
-          for (XmlElement staffChild in staff.findElements(_G)) {
+          for (XmlElement staffChild in measureChild.findElements(_G)) {
             // Only take layers, and then unpack all their children
-            if (staffChild.getAttribute(_CLASS) == _LAYER) {
-              for (XmlElement layerChild in staffChild.childElements) {
-                unpackElementBounds(layerChild, boundList, idList, -1, layerIndex);
-              }
-              layerIndex++;
+            if (XmlElementsToGrabFromStaff.contains(staffChild.getAttribute(_CLASS))) {
+              unpackElementBounds(staffChild, boundList, idList, -1, layerIndex);
+              if (staffChild.getAttribute(_CLASS) == _LAYER) layerIndex++;
             }
           }
           
@@ -257,6 +326,9 @@ class HitboxManager {
           // If no elements were found in layer, continue
           if (boundList.isEmpty) {
             print("Nothing in msi $measureStaffIndex somehow..");
+            // Close things up
+            columnMarkers[measureStaffIndex].add(measureEndX);
+            elementGroupIDs[measureStaffIndex].add("");
             continue;
           }
           
@@ -324,7 +396,31 @@ class HitboxManager {
     
   } // End initHitboxes
   
-  void parseSymbolBounds(XmlElement root) {
+  void parseSymbolTableBounds(XmlElement root) {
+    for (XmlElement symbol in root.childElements) {
+      // There shouldn't ever be something here not called <symbol>.  But to be safe, skip them.
+      if (symbol.name.toString() != _SYMBOL) continue;
+      
+      // Get information about the symbol in general
+      String symbolID = symbol.getAttribute(_ID)!;
+      
+      // Select the path and make sure assumptions hold
+      XmlElement path = symbol.childElements.first;
+      if (path.getAttribute(_TRANSFORM) != "scale(1,-1)") {
+        print("[SYMBOL PARSE] Path didn't have scale transform of 1,-1!  Was: [${path.getAttribute(_TRANSFORM)}]!");
+      }
+      
+      String dataString = path.getAttribute(_D)!;
+      
+      // Get the actual bounds of the symbol
+      List<int> bounds = getPathBounds(dataString);
+      symbolBounds["#$symbolID"] = bounds;
+      
+    }
+  }
+  
+  /// Returns a list of [minX, minY, width, height, maxX, maxY]
+  List<int> getPathBounds(String path) {
     
     /// SVG Syntax:
     /// Capital letters use absolute positioning (x, y)
@@ -342,167 +438,144 @@ class HitboxManager {
     /// Q x1 y1 x2 y2   -   - Curve with one control point, and ends at x2 y2
     /// 
     
-    for (XmlElement symbol in root.childElements) {
-      // There shouldn't ever be something here not called <symbol>.  But to be safe, skip them.
-      if (symbol.name.toString() != _SYMBOL) continue;
-      
-      // Get information about the symbol in general
-      String symbolID = symbol.getAttribute(_ID)!;
-      List<String> viewBox = symbol.getAttribute(_VIEWBOX)!.split(" ");
-      int vbWidth = int.parse(viewBox[2]);
-      int vbHeight = int.parse(viewBox[3]);
-      
-      // Select the path and make sure assumptions hold
-      XmlElement path = symbol.childElements.first;
-      if (path.getAttribute(_TRANSFORM) != "scale(1,-1)") {
-        print("[SYMBOL PARSE] Path didn't have scale transform of 1,-1!  Was: [${path.getAttribute(_TRANSFORM)}]!");
-      }
-      
-      String dataString = path.getAttribute(_D)!;
-      // Take anything that isn't a (-), a digit, or a space, and pad it with spaces.
-      List<String> data = "M ${dataString.substring(1).replaceAllMapped(RegExp(r'[^0-9 \-]'), (match) {
-        return " ${match.group(0)} ";
-      })}".trimRight().split(" ");
-      
-      //M 20 -78 c 84 97 114 180 134 329 h 170 c -13 -32 -82 -132 -99 -151 l -84 -97 c -33 -36 -59 -63 -80 -81 h 162 v 102 l 127 123 v -225 h 57 v -39 h -57 v -34 c 0 -43 19 -65 57 -65 v -34 h -244 v 36 c 48 0 60 26 60 70 v 27 h -203 v 39 z
-      
-      
-      // Current position tracking (since most stuff is relative to last position)
-      int currX = 0;
-      int currY = 0;
-      int firstX = int.parse(data[1]);
-      int firstY = int.parse(data[2]);
-      int minX = vbWidth,
-          minY = vbHeight,
-          maxX = 0,
-          maxY = 0;
-      // Purposely no automatic i increment.  Always increments differently based on command
-      for (int i = 0; i < data.length; ) {
-        switch (data[i]) {
-          case "M":
-            currX = int.parse(data[i+1]);
-            currY = int.parse(data[i+2]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 3;
-            break;
-          case "m":
-            currX += int.parse(data[i+1]);
-            currY += int.parse(data[i+2]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 3;
-            break;
-          case "L":
-            currX = int.parse(data[i+1]);
-            currY = int.parse(data[i+2]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 3;
-            break;
-          case "l":
-            currX += int.parse(data[i+1]);
-            currY += int.parse(data[i+2]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 3;
-            break;
-          case "H":
-            currX = int.parse(data[i+1]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            i += 2;
-            break;
-          case "h":
-            currX += int.parse(data[i+1]);
-            if (currX < minX) minX = currX;
-            if (currX > maxX) maxX = currX;
-            i += 2;
-            break;
-          case "V":
-            currY = int.parse(data[i+1]);
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 2;
-            break;
-          case "v":
-            currY += int.parse(data[i+1]);
-            if (currY < minY) minY = currY;
-            if (currY > maxY) maxY = currY;
-            i += 2;
-            break;
-          case "C":
-            List<int> locals = parseCurveInPath(data, i, currX, currY, true, false);
-            if (locals[0] < minX) minX = locals[0];
-            if (locals[1] < minY) minY = locals[1];
-            if (locals[2] > maxX) maxX = locals[2];
-            if (locals[3] > maxY) maxY = locals[3];
-            currX = locals[4];
-            currY = locals[5];
-            i += 7;
-            break;
-          case "c":
-            List<int> locals = parseCurveInPath(data, i, currX, currY, true, true);
-            if (locals[0] < minX) minX = locals[0];
-            if (locals[1] < minY) minY = locals[1];
-            if (locals[2] > maxX) maxX = locals[2];
-            if (locals[3] > maxY) maxY = locals[3];
-            currX = locals[4];
-            currY = locals[5];
-            i += 7;
-            break;
-          case "Z":
-          case "z":
-            currX = firstX;
-            currY = firstY;
-            i += 1;
-            break;
-          case "S":
-          case "Q":
-            List<int> locals = parseCurveInPath(data, i, currX, currY, false, false);
-            if (locals[0] < minX) minX = locals[0];
-            if (locals[1] < minY) minY = locals[1];
-            if (locals[2] > maxX) maxX = locals[2];
-            if (locals[3] > maxY) maxY = locals[3];
-            currX = locals[4];
-            currY = locals[5];
-            i += 5;
-            break;
-          case "s":
-          case "q":
-            List<int> locals = parseCurveInPath(data, i, currX, currY, false, true);
-            if (locals[0] < minX) minX = locals[0];
-            if (locals[1] < minY) minY = locals[1];
-            if (locals[2] > maxX) maxX = locals[2];
-            if (locals[3] > maxY) maxY = locals[3];
-            currX = locals[4];
-            currY = locals[5];
-            i += 5;
-            break;
-          case "":
-          case " ":
-            i++;
-            continue;
-          // I'm not supporting T and t right now.  I don't think Verovio uses those
-          default:
-            print("Unexpected svg command: ${data[i]}!");
-            i++;
-            continue;
-        } // end Switch
-      } // end For block
-      
-      List<int> bounds = [minX, minY, (maxX - minX), (maxY - minY), maxX, maxY];
-      symbolBounds["#$symbolID"] = bounds;
-      
-    } // end For Symbol in Defs
+    // Take anything that isn't a (-), a digit, or a space, and pad it with spaces.
+    List<String> data = "M ${path.substring(1).replaceAllMapped(RegExp(r'[^0-9 \-]'), (match) {
+      return " ${match.group(0)} ";
+    })}".trimRight().split(" ");
+    
+    // Current position tracking (since most stuff is relative to last position)
+    int currX = 0;
+    int currY = 0;
+    int firstX = int.parse(data[1]);
+    int firstY = int.parse(data[2]);
+    int minX = pageWidth,
+        minY = pageHeight,
+        maxX = 0,
+        maxY = 0;
+    // Purposely no automatic i increment.  Always increments differently based on command
+    for (int i = 0; i < data.length; ) {
+      switch (data[i]) {
+        case "M":
+          currX = int.parse(data[i+1]);
+          currY = int.parse(data[i+2]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 3;
+          break;
+        case "m":
+          currX += int.parse(data[i+1]);
+          currY += int.parse(data[i+2]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 3;
+          break;
+        case "L":
+          currX = int.parse(data[i+1]);
+          currY = int.parse(data[i+2]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 3;
+          break;
+        case "l":
+          currX += int.parse(data[i+1]);
+          currY += int.parse(data[i+2]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 3;
+          break;
+        case "H":
+          currX = int.parse(data[i+1]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          i += 2;
+          break;
+        case "h":
+          currX += int.parse(data[i+1]);
+          if (currX < minX) minX = currX;
+          if (currX > maxX) maxX = currX;
+          i += 2;
+          break;
+        case "V":
+          currY = int.parse(data[i+1]);
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 2;
+          break;
+        case "v":
+          currY += int.parse(data[i+1]);
+          if (currY < minY) minY = currY;
+          if (currY > maxY) maxY = currY;
+          i += 2;
+          break;
+        case "C":
+          List<int> locals = parseCurveInPath(data, i, currX, currY, true, false);
+          if (locals[0] < minX) minX = locals[0];
+          if (locals[1] < minY) minY = locals[1];
+          if (locals[2] > maxX) maxX = locals[2];
+          if (locals[3] > maxY) maxY = locals[3];
+          currX = locals[4];
+          currY = locals[5];
+          i += 7;
+          break;
+        case "c":
+          List<int> locals = parseCurveInPath(data, i, currX, currY, true, true);
+          if (locals[0] < minX) minX = locals[0];
+          if (locals[1] < minY) minY = locals[1];
+          if (locals[2] > maxX) maxX = locals[2];
+          if (locals[3] > maxY) maxY = locals[3];
+          currX = locals[4];
+          currY = locals[5];
+          i += 7;
+          break;
+        case "Z":
+        case "z":
+          currX = firstX;
+          currY = firstY;
+          i += 1;
+          break;
+        case "S":
+        case "Q":
+          List<int> locals = parseCurveInPath(data, i, currX, currY, false, false);
+          if (locals[0] < minX) minX = locals[0];
+          if (locals[1] < minY) minY = locals[1];
+          if (locals[2] > maxX) maxX = locals[2];
+          if (locals[3] > maxY) maxY = locals[3];
+          currX = locals[4];
+          currY = locals[5];
+          i += 5;
+          break;
+        case "s":
+        case "q":
+          List<int> locals = parseCurveInPath(data, i, currX, currY, false, true);
+          if (locals[0] < minX) minX = locals[0];
+          if (locals[1] < minY) minY = locals[1];
+          if (locals[2] > maxX) maxX = locals[2];
+          if (locals[3] > maxY) maxY = locals[3];
+          currX = locals[4];
+          currY = locals[5];
+          i += 5;
+          break;
+        case "":
+        case " ":
+          i++;
+          continue;
+        // I'm not supporting T and t right now.  I don't think Verovio uses those
+        default:
+          print("Unexpected svg command: ${data[i]}!");
+          i++;
+          continue;
+      } // end Switch
+    } // end For block
+    
+    return [minX, minY, (maxX - minX), (maxY - minY), maxX, maxY];
     
   }
   
@@ -596,6 +669,7 @@ class HitboxManager {
     if (el.name.toString() != _G) return;
     
     String elClass = el.getAttribute(_CLASS) ?? "";
+    //print("Unpacking el class $elClass");
     
     int elID = -1;
     if (!ElementsWhoseIDToIgnore.contains(elClass)) {
@@ -626,7 +700,14 @@ class HitboxManager {
           break;
         case _REST:
         case _MREST:
-          extractHitboxOfRest(el, boundsList, idList, groupID, elID, layer);
+        case _CLEF:
+          extractHitboxOfSingleElement(el, boundsList, idList, groupID, elID, layer);
+          break;
+        case _KEYACCID:
+          extractHitboxOfKeyAccidental(el, boundsList, idList, groupID, elID, layer);
+          break;
+        case _METERSIG:
+          extractHitboxOfMeterSignature(el, boundsList, idList, groupID, elID, layer);
           break;
         default:
           print("[Unpacker] Element class not expected!  Class: $elClass");
@@ -705,7 +786,7 @@ class HitboxManager {
     
   }
   
-  void extractHitboxOfRest(XmlElement el, List<List<int>> boundsList, List<String> idList, int groupID, int elementID, int layer) {
+  void extractHitboxOfSingleElement(XmlElement el, List<List<int>> boundsList, List<String> idList, int groupID, int elementID, int layer) {
     // Check appropriate group ID
     if (groupID == -1) {
       // If no group holds this, then the group ID = element ID for insertion purposes
@@ -731,6 +812,78 @@ class HitboxManager {
     boundsList.add(bounds);
   }
   
+  /// Same as single element, but make it a bit wider so it overlaps with neighbors
+  void extractHitboxOfKeyAccidental(XmlElement el, List<List<int>> boundsList, List<String> idList, int groupID, int elementID, int layer) {
+    // Check appropriate group ID
+    if (groupID == -1) {
+      // If no group holds this, then the group ID = element ID for insertion purposes
+      groupID = elementID;
+    }
+    
+    // Parse the x, y, width, and height mentioned in the <use> tag
+    List<int> elUseBounds = parseXYWH(el.firstElementChild!);
+    
+    // Find the tag ID that the <use> tag references
+    String? elTagID = el.firstElementChild?.getAttribute(_XLINKHREF);
+    if (elTagID == null) {
+      print("Failed to get tag ID!");
+      elTagID = "";
+    }
+    
+    // Call method to adjust the Hitbox to fit actual glyph
+    List<int> bounds = getBoundsAfterScaling(elUseBounds, elTagID);
+    
+    // KEY SIGNATURE SPECIFIC STUFF HERE (Make make a bit wider)
+    // Shift left a bit
+    bounds[0] -= KeyAccidExtraWidth ~/ 2;
+    // Make box wider
+    bounds[2] += KeyAccidExtraWidth;
+    
+    // Add in metadata about hitbox
+    bounds.addAll([ layer, elementID, groupID ]);
+    // Add hitbox to end list
+    boundsList.add(bounds);
+  }
+  
+  /// Same as normal, but assume two <use> tags, second one underneath the first.
+  void extractHitboxOfMeterSignature(XmlElement el, List<List<int>> boundsList, List<String> idList, int groupID, int elementID, int layer) {
+    // Check appropriate group ID
+    if (groupID == -1) {
+      // If no group holds this, then the group ID = element ID for insertion purposes
+      groupID = elementID;
+    }
+    
+    XmlElement child1 = el.childElements.elementAt(0);
+    XmlElement child2 = el.childElements.elementAt(1);
+    
+    // Parse the x, y, width, and height mentioned in the <use> tag
+    List<int> elUseBounds1 = parseXYWH(child1);
+    List<int> elUseBounds2 = parseXYWH(child2);
+    
+    // Find the tag ID that the <use> tag references
+    String? elTagID1 = child1.getAttribute(_XLINKHREF);
+    if (elTagID1 == null) {
+      print("Failed to get tag ID! (for meter sig 1)");
+      elTagID1 = "";
+    }
+    String? elTagID2 = child2.getAttribute(_XLINKHREF);
+    if (elTagID2 == null) {
+      print("Failed to get tag ID! (for meter sig 2)");
+      elTagID2 = "";
+    }
+    
+    // Call method to adjust the Hitbox to fit actual glyph
+    List<int> bounds1 = getBoundsAfterScaling(elUseBounds1, elTagID2);
+    List<int> bounds2 = getBoundsAfterScaling(elUseBounds2, elTagID2);
+    
+    // Add in metadata about hitbox
+    bounds1.addAll([ layer, elementID, groupID ]);
+    bounds2.addAll([ layer, elementID, groupID ]);
+    // Add hitbox to end list
+    boundsList.add(bounds1);
+    boundsList.add(bounds2);
+  }
+  
   /// Returns a list containing the adjusted [x, y, width, height]
   List<int> getBoundsAfterScaling(List<int> elUseBounds, String elTagID, ) {
     
@@ -749,12 +902,11 @@ class HitboxManager {
     // top  bound is Y + ((vpheight + maxY - symbolHeight) * (height / vpheight))
     // width  is symbolWidth  * (width / vpwidth)
     // height is symbolHeight * (height / vpheight)
-
-    double scalar = elUseBounds[2] / ASSUMED_VIEWPORT_SIZE;
+    
+    double scalar = elUseBounds[2] / ASSUMED_SYMBOL_VIEWPORT_SIZE;
     return [
-      elUseBounds[0] + ((ASSUMED_VIEWPORT_SIZE + elSymbolBounds[0] - elSymbolBounds[2]) * scalar).round(),
-      // Originally, elSymbolBounds[5] - ...
-      elUseBounds[1] + ((ASSUMED_VIEWPORT_SIZE + elSymbolBounds[1] - elSymbolBounds[3]) * scalar).round(),
+      pageOffsetX + elUseBounds[0] + (elSymbolBounds[0] * scalar).round(),
+      pageOffsetY + elUseBounds[1] + (-elSymbolBounds[5] * scalar).round(),
       (elSymbolBounds[2] * scalar).round(),
       (elSymbolBounds[3] * scalar).round()
     ];
@@ -794,6 +946,74 @@ class HitboxManager {
     ];
   } 
   
+  void parseFloatingRect(XmlElement el) {
+    print("Pretending to parse this floating rect:\n$el");
+    
+    String elClass = el.getAttribute(_CLASS) ?? "";
+    
+    switch (elClass) {
+      case _TIE:
+        parseFloatingTieRect(el);
+        break;
+      case _HAIRPIN:
+        parseFloatingHairPinRect(el);
+    }
+    
+    /*
+    Option 1: Directive text
+    
+    <g id="d1x1taea" class="dir">
+      <text x="3189" y="276" font-size="0px">
+          <tspan id="rk2beft" class="rend">
+            <tspan id="t11cm0tu" class="text">
+                <tspan font-size="405px">Not fast.</tspan>
+            </tspan>
+          </tspan>
+      </text>
+    </g>
+    
+    Option 2: Dynamics Symbol
+    
+    <g id="dx64erm" class="dynam">
+      <title class="labelAttr">direction</title>
+      <use xlink:href="#E520-10ny6tc" x="4993" y="6476" height="720px" width="720px" />
+    </g>
+    
+    Option 3: Slur
+    
+    <g id="sok2s56" class="slur">
+      <path d="M5430,8379 C5736,8490 6165,8235 6252,7749 C6223,8273 5739,8558 5430,8379" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
+    </g>
+    
+    Option 4: Hairpin
+    
+    <g id="h736oid" class="hairpin">
+      <polyline stroke="currentColor" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter" fill="none" points="13603,6566 12118,6431 13603,6296 " />
+    </g>
+    
+    Option 5: Tie
+    
+    <g id="t1awxv0b" class="tie">
+      <path d="M13761,5387 C13828,5495 13902,5495 13972,5387 C13932,5541 13797,5541 13761,5387" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
+    </g>
+    */
+  }
+  
+  void parseFloatingTieRect(XmlElement el) {
+    
+  }
+  
+  void parseFloatingHairPinRect(XmlElement el) {
+    
+  }
+  
+  void parseFloatingDynamRect(XmlElement el) {
+    
+  }
+  
+  void parseFloatingDirRect(XmlElement el) {
+    
+  }
   
   String drawHitboxes() {
     
@@ -806,7 +1026,6 @@ class HitboxManager {
     }
     
     for (int r = 0; r < rowMarkers.length-1; r++) {
-      print("Column lines: ${columnMarkers[r]}");
       for (int col in columnMarkers[r]) {
         // Draw the column Lines (BLUE)
         svg += "<path d='M$col ${rowMarkers[r]} L$col ${rowMarkers[r+1]}' stroke='#0000FF' stroke-width='17' />";
@@ -820,9 +1039,20 @@ class HitboxManager {
           int endX = box[0] + box[2];
           int endY = box[1] + box[3];
           // Draw an X per hitbox
-          svg += "<path d='M${box[0]} ${box[1]}, $endX $endY' stroke='#0000FF' stroke-width='20' data-id='${elementIDs[r][c][g]}' />";
-          svg += "<path d='M$endX ${box[1]}, ${box[0]} $endY' stroke='#0000FF' stroke-width='20' data-id='${elementIDs[r][c][g]}' />";
+          svg += "<path d='M${box[0]} ${box[1]}, $endX $endY' stroke='#00FF00' stroke-width='20' data-id='${elementIDs[r][c][g]}' />";
+          svg += "<path d='M$endX ${box[1]}, ${box[0]} $endY' stroke='#00FF00' stroke-width='20' data-id='${elementIDs[r][c][g]}' />";
         }
+      }
+    }
+    
+    for (int r = 0; r < floatingRects.length; r++) {
+      for (int i = 0; i < floatingRects[r].length; i++) {
+        List<int> box = floatingRects[r][i];
+        int endX = box[0] + box[2];
+        int endY = box[1] + box[3];
+        // Draw an X per hitbox
+        svg += "<path d='M${box[0]} ${box[1]}, $endX $endY' stroke='#00FF00' stroke-width='20' data-id='${floatingRectDesc[r][i]}' />";
+        svg += "<path d='M$endX ${box[1]}, ${box[0]} $endY' stroke='#00FF00' stroke-width='20' data-id='${floatingRectDesc[r][i]}' />";
       }
     }
 
