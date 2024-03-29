@@ -4,6 +4,7 @@
 // Few things to know about this class:
 //  - "Accid" means accidental (sharp or flat sign)
 //  - "Dir" means directive (plain text telling the player what to do or how to do it)
+//  - "Hair Pin" is the alligator mouth that tells you to slowly start playing louder/softer
 //  - When using any numbering system, the general rule is that 10 = 1px.
 //    - So a box of size 1000x1000 is actually 100px square
 
@@ -12,7 +13,6 @@
 
 import 'dart:math';
 
-import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 import 'package:xml/xpath.dart';
 
@@ -45,6 +45,7 @@ class HitboxManager {
       _NOTE = "note",
       _PAGE_MARGIN = "page-margin", 
       _PATH = "path",
+      _POINTS = "points",
       _REST = "rest",
       _SLUR = "slur",
       _SPACE = "space",
@@ -138,14 +139,14 @@ class HitboxManager {
   }
   
   void initHitboxes(String imageSVG) {
-    // Test
-    //columnMarkers.add([]);
+    // Prep a list of things to parse later
+    List<XmlElement> floatingRectElementsToParse = [];
     
     // Let the XML library parse the SVG document as an xml doc
     final doc = XmlDocument.parse(imageSVG);
     
     // Parse all the real bounds from each reused symbol
-    parseSymbolBounds(doc.getElement(_SVG)!.getElement(_DEFS)!);
+    parseSymbolTableBounds(doc.getElement(_SVG)!.getElement(_DEFS)!);
     
     // Scrape the page dimensions from the main SVG tag's attributes
     List<String> pageDims = doc.getElement(_SVG)!.getAttribute(_VIEWBOX)!.split(" ");
@@ -234,7 +235,7 @@ class HitboxManager {
         for (XmlElement measureChild in measure.childElements) {
           if (measureChild.getAttribute(_CLASS) != _STAFF) {
               if (SpecialRectsToGrabFromMeasure.contains(measureChild.getAttribute(_CLASS))) {
-                parseFloatingRect(measureChild);
+                floatingRectElementsToParse.add(measureChild);
               }
               // Don't move on to treat this like a staff
               continue;
@@ -394,7 +395,15 @@ class HitboxManager {
     // Add a final row marker for the last layer
     rowMarkers.add( rowMaxY[rowMaxY.length-1] + LowestStaffHitboxMargin );
     
+    // Finally, get all the floating rects parsed
+    parseAllFloatingRects(floatingRectElementsToParse);
   } // End initHitboxes
+  
+  void parseAllFloatingRects(List<XmlElement> els) {
+    for (XmlElement el in els) {
+      parseFloatingRect(el);
+    }
+  }
   
   void parseSymbolTableBounds(XmlElement root) {
     for (XmlElement symbol in root.childElements) {
@@ -439,7 +448,7 @@ class HitboxManager {
     /// 
     
     // Take anything that isn't a (-), a digit, or a space, and pad it with spaces.
-    List<String> data = "M ${path.substring(1).replaceAllMapped(RegExp(r'[^0-9 \-]'), (match) {
+    List<String> data = "M ${path.replaceAll(",", " ").substring(1).replaceAllMapped(RegExp(r'[^0-9 \-]'), (match) {
       return " ${match.group(0)} ";
     })}".trimRight().split(" ");
     
@@ -947,7 +956,6 @@ class HitboxManager {
   } 
   
   void parseFloatingRect(XmlElement el) {
-    print("Pretending to parse this floating rect:\n$el");
     
     String elClass = el.getAttribute(_CLASS) ?? "";
     
@@ -957,12 +965,95 @@ class HitboxManager {
         break;
       case _HAIRPIN:
         parseFloatingHairPinRect(el);
+        break;
+      case _DYNAM:
+        parseFloatingDynamRect(el);
+        break;
+      case _SLUR:
+        parseFloatingSlurRect(el);
+        break;
+      case _DIR:
+        parseFloatingDirRect(el);
+        break;
+      default:
+        print("Unknown floating rect type: [$elClass] !");
+    }
+  }
+  
+  void parseFloatingTieRect(XmlElement el) {
+    /*<g id="t1awxv0b" class="tie">
+      <path d="M13761,5387 C13828,5495 13902,5495 13972,5387 C13932,5541 13797,5541 13761,5387" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
+    </g>*/
+    
+    // In future, use slur method. This is close enough for now though.
+    
+    XmlElement elUse = el.firstElementChild!;
+    List<int> tieBounds = getPathBounds(elUse.getAttribute(_D)!);
+    tieBounds[0] += pageOffsetX;
+    tieBounds[1] += pageOffsetY;
+    
+    int rowIndex = getRowIndex(tieBounds[1]);
+    floatingRects[rowIndex].add(tieBounds.sublist(0, 5));
+    floatingRectDesc[rowIndex].add("$_TIE:${el.getAttribute(_ID)}");
+  }
+  
+  void parseFloatingHairPinRect(XmlElement el) {
+    /*<g id="h736oid" class="hairpin">
+      <polyline stroke="currentColor" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter" fill="none" points="13603,6566 12118,6431 13603,6296 " />
+    </g>*/
+    
+    int maxX = 0, maxY = 0, minX = pageWidth, minY = pageHeight;
+    
+    String pointsString = el.firstElementChild!.getAttribute(_POINTS)!;
+    print("PointsString: $pointsString");
+    for (String pointString in pointsString.trim().split(" ")) {
+      List<String> pos = pointString.trim().split(",");
+      if (pos.isEmpty) continue;
+      print("Pos: $pos");
+      int x = int.parse(pos[0]);
+      int y = int.parse(pos[1]);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
     
-    /*
-    Option 1: Directive text
+    int width = maxX - minX;
+    int height = maxY - minY;
+    minX += pageOffsetX;
+    minY += pageOffsetY;
     
-    <g id="d1x1taea" class="dir">
+    int rowIndex = getRowIndex(minY);
+    floatingRects[rowIndex].add([minX, minY, width, height]);
+    floatingRectDesc[rowIndex].add("$_HAIRPIN:${el.getAttribute(_ID)}");
+  }
+  
+  void parseFloatingDynamRect(XmlElement el) {
+    /*<g id="dx64erm" class="dynam">
+      <title class="labelAttr">direction</title>
+      <use xlink:href="#E520-10ny6tc" x="4993" y="6476" height="720px" width="720px" />
+    </g>*/
+    
+    XmlElement useTag = el.childElements.elementAt(1);
+    List<int> elUseBounds = parseXYWH(useTag);
+    
+    // Find the tag ID that the <use> tag references
+    String? elTagID = useTag.getAttribute(_XLINKHREF);
+    if (elTagID == null) {
+      print("Failed to get tag ID!");
+      elTagID = "";
+    }
+    
+    // Call method to adjust the Hitbox to fit actual glyph
+    List<int> bounds = getBoundsAfterScaling(elUseBounds, elTagID);
+    
+    int rowIndex = getRowIndex(bounds[0]);
+    floatingRects[rowIndex].add(bounds);
+    floatingRectDesc[rowIndex].add("$_DYNAM:${el.getAttribute(_D)}");
+  }
+  
+  void parseFloatingDirRect(XmlElement el) {
+    /*<g id="d1x1taea" class="dir">
       <text x="3189" y="276" font-size="0px">
           <tspan id="rk2beft" class="rend">
             <tspan id="t11cm0tu" class="text">
@@ -970,49 +1061,17 @@ class HitboxManager {
             </tspan>
           </tspan>
       </text>
-    </g>
+    </g>*/
     
-    Option 2: Dynamics Symbol
     
-    <g id="dx64erm" class="dynam">
-      <title class="labelAttr">direction</title>
-      <use xlink:href="#E520-10ny6tc" x="4993" y="6476" height="720px" width="720px" />
-    </g>
     
-    Option 3: Slur
-    
-    <g id="sok2s56" class="slur">
+  }
+  
+  void parseFloatingSlurRect(XmlElement el) {
+    /*<g id="sok2s56" class="slur">
       <path d="M5430,8379 C5736,8490 6165,8235 6252,7749 C6223,8273 5739,8558 5430,8379" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
-    </g>
-    
-    Option 4: Hairpin
-    
-    <g id="h736oid" class="hairpin">
-      <polyline stroke="currentColor" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter" fill="none" points="13603,6566 12118,6431 13603,6296 " />
-    </g>
-    
-    Option 5: Tie
-    
-    <g id="t1awxv0b" class="tie">
-      <path d="M13761,5387 C13828,5495 13902,5495 13972,5387 C13932,5541 13797,5541 13761,5387" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
-    </g>
-    */
-  }
-  
-  void parseFloatingTieRect(XmlElement el) {
-    
-  }
-  
-  void parseFloatingHairPinRect(XmlElement el) {
-    
-  }
-  
-  void parseFloatingDynamRect(XmlElement el) {
-    
-  }
-  
-  void parseFloatingDirRect(XmlElement el) {
-    
+    </g>*/
+    // Do nothing for now.  Not sure how to select a slur
   }
   
   String drawHitboxes() {
