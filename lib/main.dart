@@ -13,14 +13,15 @@ import 'verovio/verovio_api.dart';
 
 void makeVerovioEngraving() {
   VerovioAPI verovio = VerovioAPI();
-  String meiContent = IOWorker.getFileText("Joplin_Maple_leaf_Rag.mei");
+  //String meiContent = IOWorker.getFileText("Joplin_Maple_leaf_Rag.mei");
+  String meiContent = IOWorker.getFileText("oneLine.mei");
   // print(verovio.getOptions());
   verovio.setOptions("""{
     'footer': 'none'
   }""");
   verovio.loadData(meiContent);
   String svgContent = verovio.getSVGOutput(generateXml: true);
-  File file = File("assets/svgOutput.svg");
+  File file = File("assets/svgOutputMinimized.svg");
   file.writeAsString(svgContent);
   // Done writing file!
 }
@@ -44,6 +45,7 @@ class MainApp extends StatelessWidget {
     manager.initHitboxes(musicSvg);
     String hitboxString = manager.drawHitboxes();
     String jointSvg = musicSvg.replaceFirst("</svg>", "") + hitboxString.replaceFirst("<svg viewBox='0 0 21000 29700' width='2100px' height='2970px'>", "");
+    
     
     return MaterialApp(
       home: Scaffold(
